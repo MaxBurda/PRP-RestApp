@@ -1,11 +1,11 @@
 import React from 'react';
-import io from 'socket.io-client';
 
 import Header from 'app/components/Header';
 import SideMenu from 'app/components/SideMenu';
 import OfflineNotifier from 'app/components/OfflineNotifier';
 import ImgList from 'app/components/ImgList';
-
+import socket from 'app/util/websockets'
+import style from './style.scss';
 
 
 class MainPage extends React.Component {
@@ -70,13 +70,21 @@ class MainPage extends React.Component {
 				},
 			]
 		}
-		this.socket = io(window.hostname);
-		this.socket.on('connect',this.handleOnline);
-		this.socket.on('disconnect',this.handleOffline);
+		socket.on('connect', this.handleOnline);
+		socket.on('disconnect', this.handleOffline);
 	}
 
-	handleOnline = () => {this.setState({ isOnline: true })};
-	handleOffline = () => {this.setState({ isOnline: false })};
+	handleOnline = () => { this.setState({ isOnline: true }) };
+	handleOffline = () => { this.setState({ isOnline: false }) };
+
+	handleLogout = () => {
+		fetch('/auth/logout', { credentials: 'include' })
+			.then((response) => {
+				if (response.ok) {
+					this.setState({ isAuthenticated: false })
+				}
+			});
+	}
 
 	checkAuth = () =>
 		fetch('/api/whoami', { credentials: 'include' })
@@ -120,17 +128,23 @@ class MainPage extends React.Component {
 			in: '/auth/linkid'
 		}
 
-		let authWin = window.open(mapperURL[provider], 'RESTAPP Auth window', "menubar=no,location=no,resizable=no,scrollbars=yes,status=no")
-		let authChecker = setInterval(() => {
-			if (authWin.closed) { clearInterval(authChecker); }
-			this.checkAuth().then((userData) => {
-				if (userData) {
-					authWin.close();
-					this.processLogin();
-				}
-			})
-		}
-			, 1000);
+		let w = 1000;
+		let h = 600;
+		let left = (screen.width / 2) - (w / 2);
+		let top = (screen.height / 2) - (h / 2);
+		let authWin = window.open(mapperURL[provider], 'RESTAPP Auth window',
+			`width=${w},height=${h},top=${top},left=${left},menubar=no,location=no,resizable=no,scrollbars=yes,status=no`)
+
+		let authTimeoutTimer = setTimeout(() => { authWin.close(); }, 90000);
+
+		// rearm event handler
+		socket.off('user_auth_ok');
+		socket.once('user_auth_ok', () => {
+			clearTimeout(authTimeoutTimer);
+			if (!authWin.closed) { authWin.close(); }
+			this.processLogin();
+		})
+
 	}
 
 	componentDidMount() {
@@ -150,24 +164,36 @@ class MainPage extends React.Component {
 	}
 
 	render() {
-		return (<div>
-			<Header
-				handleAuthFormShow={this.handleAuthFormShow}
-				handleAuthFormHide={this.handleAuthFormHide}
-				isAuthFormShown={this.state.isAuthFormShown}
-				isAuthenticated={this.state.isAuthenticated}
-				userInfo={this.state.userInfo}
-				handleAuthFormDoAuth={this.handleAuthFormDoAuth}
-				isOnline={this.state.isOnline}
-			/>
-			<SideMenu
-				sideMenu={this.state.sideMenu}
-			/>
-			<OfflineNotifier isOnline={this.state.isOnline} />
-			<ImgList
-				tilesData={this.state.tilesData}
-			/>
-		</div>
+		return (
+			<div className={style.wrapper}>
+				<div className={style.header}>
+					<Header
+						handleAuthFormShow={this.handleAuthFormShow}
+						handleAuthFormHide={this.handleAuthFormHide}
+						isAuthFormShown={this.state.isAuthFormShown}
+						isAuthenticated={this.state.isAuthenticated}
+						userInfo={this.state.userInfo}
+						handleAuthFormDoAuth={this.handleAuthFormDoAuth}
+						isOnline={this.state.isOnline}
+						handleLogout={this.handleLogout}
+					/>
+				</div>
+
+				<div className={style.wrapper2}>
+					<div className={style.sidemenu}>
+						<SideMenu
+							sideMenu={this.state.sideMenu}
+						/>
+					</div>
+					<div className={style.content}>
+
+						<ImgList
+							tilesData={this.state.tilesData}
+						/>
+					</div>
+				</div>
+				<OfflineNotifier isOnline={this.state.isOnline} />
+			</div>
 		)
 	}
 }
