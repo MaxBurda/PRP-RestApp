@@ -6,22 +6,20 @@ const authModel = require('models/auth');
 
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
-
+const authmw = require('./authmw');
 
 passport.use(new LocalStrategy(
 	{
-		usernameField: 'username',
+		usernameField: 'email',
 		passwordField: 'password'
 	}, authModel.authenticateLocal()
 ));
 
 
 //local auth handler
-router.post('/',
-		passport.authenticate('local', {
-		successRedirect: '/auth/postauth',
-		failureRedirect: '/',
-		failureFlash: false
-	}));
+//using custom middleware to avoid 401 error.
+router.post('/', (req, res, next) => {
+	passport.authenticate('local', authmw(req,res,next))(req, res, next);
+})
 
 module.exports = router;

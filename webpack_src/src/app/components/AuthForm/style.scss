@@ -13,8 +13,18 @@
 		justify-content: space-around;
 		flex-direction: row;
 		min-height: 200px;
+		width: 100%;
 	}
 
+.darken {
+	position:absolute;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: rgba(0,0,0,0.5);
+	height:100%;
+	width:100%;
+}
 
 .maincolumn {
 	@include debugdiv;

@@ -23,11 +23,11 @@ Auth.plugin(passportLocalMongoose, {
 });
 
 /**
- * Add auth Record and update ref in user
+ * Add auth Record and update ref in user.
  * @returns {Promise}
- * @param  {UserDoc} user
- * @param  {Object} profile
- * @param  {String} token
+ * @param {UserDoc} user
+ * @param {Object} profile
+ * @param {String} token
  */
 Auth.statics.addAuthRecord = function (user, profile, token) {
 
@@ -58,22 +58,29 @@ Auth.statics.findOrCreate = function (profile, token, cb) {
 	this.findOne(query).exec()
 		.then(authData => {
 			if (authData) {
-				return userModel.findById(authData.user).exec().then(user => cb(null, { user: user, authRecord: authData }));
-			} else {
-				return userModel.findByEmail(profile.emails[0].value)
-					.then(user => {
-						if (!user) {
-							user = new userModel({
-								email: profile.emails[0].value
-								, username: profile.username
-								, auth: []
-							});
-						}
-						this.addAuthRecord(user, profile, token)
-							.then(result => cb(null, result))
-							.catch(err => cb(err, null))
-					})
+				return userModel
+					.findById(authData.user)
+					.exec()
+					.then(user => cb(null, {
+						user: user, authRecord: authData
+					}));
 			}
+			return userModel
+				.findByEmail(profile.emails[0].value)
+				.then(user => {
+					if (!user) {
+						user = new userModel({
+							email: profile.emails[0].value
+							, username: profile.username
+							, auth: []
+						});
+					}
+
+					this.addAuthRecord(user, profile, token)
+						.then(result => cb(null, result))
+						.catch(err => cb(err, null))
+				})
+
 		})
 		.catch(err => cb(err, null))
 };
@@ -101,21 +108,19 @@ Auth.statics.registerLocal = function (userData, cb) {
 				res(authRecord);
 			}
 		})
-	})
-		.then(authRecord => {
-			return new Promise((res, rej) => {
-				authRecord.setPassword(userData.password, (setPasswordErr, authData) => {
-					if (setPasswordErr) {
-						rej(new Error(setPasswordErr));
-					} else {
-						res(authData);
-					}
-				})
+	}).then(authRecord => {
+		return new Promise((res, rej) => {
+			authRecord.setPassword(userData.password, (setPasswordErr, authData) => {
+				if (setPasswordErr) {
+					rej(new Error(setPasswordErr));
+				} else {
+					res(authData);
+				}
 			})
 		})
-		.then(authData => authData.save())
-		.then(authData => cb(null, authData))
-		.catch(err => cb(err));
+	}).then(authData => authData.save())
+	.then(authData => cb(null, authData))
+	.catch(err => cb(err));
 }
 
 Auth.statics.authenticateLocal = function () {
@@ -158,7 +163,17 @@ Auth.statics.authenticateLocal = function () {
 			.then(verifiedUser => {
 				return cb(null, verifiedUser)
 			})
-			.catch(err => cb(err, false, 'error:' + err));
+			.catch(err => {
+				switch (err.message) {
+					case 'Email not found':
+					case 'Auth data for local auth is not found':
+					case 'Invalid password (local)':
+						cb(null, false, { message: 'local user or local authData not found or invalid password' });
+						break;
+					default:
+						cb(err, false, 'error:' + err)
+				}
+			});
 	}
 }
 
